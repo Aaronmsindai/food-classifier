@@ -1,39 +1,17 @@
 import streamlit as st
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import transforms, models
+import requests
 from PIL import Image
 
 # --- 1. Page Config ---
 st.set_page_config(page_title="Food Classifier", page_icon="🍕", layout="centered")
 st.title("🍕 AI Food Classifier")
-st.markdown("Upload a photo of food, and my ResNet18 model will identify it. Trained on a 9-class subset of Food-101.")
+st.markdown("Upload a photo of food, and the API will identify it. Trained on a 9-class subset of Food-101.")
 
-# --- 2. Load Model (Cached so it only loads once) ---
-@st.cache_resource
-def load_model():
-    device = torch.device("cpu")  # Streamlit Cloud uses CPU
-    model = models.resnet18(weights=None)
-    model.fc = nn.Linear(model.fc.in_features, 9)
-    # Load the saved weights
-    model.load_state_dict(torch.load("food_classifier_resnet.pth", map_location=device))
-    model = model.to(device)
-    model.eval()
-    return model, device
+# --- 2. API URL ---
+# Change this to your Render URL once deployed!
+API_URL = "http://localhost:8000/predict" 
 
-model, device = load_model()
-
-# --- 3. Define Transforms and Classes ---
-transform = transforms.Compose([
-    transforms.Resize((128, 128)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-
-classes = ['donuts', 'french_fries', 'hamburger', 'ice_cream', 'pizza', 'ramen', 'steak', 'sushi', 'tacos']
-
-# --- 4. File Uploader ---
+# --- 3. File Uploader ---
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
@@ -43,23 +21,27 @@ if uploaded_file is not None:
     
     st.write("### Analyzing...")
     
-    # Preprocess the image
-    img_tensor = transform(image).unsqueeze(0).to(device)
-    
-    # Make prediction
-    with torch.no_grad():
-        outputs = model(img_tensor)
-        probabilities = F.softmax(outputs, dim=1)[0]
-        predicted_idx = probabilities.argmax().item()
-    
-    # Display results
-    st.success(f"**Prediction: {classes[predicted_idx].replace('_', ' ').title()}**")
-    st.metric("Confidence", f"{probabilities[predicted_idx].item() * 100:.2f}%")
-    
-    # Show all probabilities as a bar chart
-    st.write("### All Probabilities")
-    probs_dict = {cls.replace('_', ' ').title(): prob.item() * 100 for cls, prob in zip(classes, probabilities)}
-    st.bar_chart(probs_dict)
+    if st.button("Run Prediction", type="primary"):
+        with st.spinner("Sending image to API..."):
+            try:
+                # Prepare the file to send
+                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                
+                # Send to FastAPI
+                response = requests.post(API_URL, files=files)
+                response.raise_for_status()
+                data = response.json()
+                
+                # Display results
+                st.success(f"**Prediction: {data['prediction']}**")
+                st.metric("Confidence", f"{data['confidence']}%")
+                
+                # Show all probabilities
+                st.write("### All Probabilities")
+                st.bar_chart(data['all_probabilities'])
+                
+            except Exception as e:
+                st.error(f"Error connecting to API: {e}")
 
 st.divider()
-st.caption("Built with PyTorch, Transfer Learning, and Streamlit.")
+st.caption("Built with PyTorch, FastAPI, Transfer Learning, and Streamlit.")
