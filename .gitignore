@@ -1,5 +1,4 @@
-data/
-venv/
+.venv/
 __pycache__/
-.streamlit/
-.env
+*.pth
+.DS_Store
