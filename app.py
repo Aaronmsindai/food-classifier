@@ -7,9 +7,7 @@ st.set_page_config(page_title="Food Classifier", page_icon="🍕", layout="cente
 st.title("🍕 AI Food Classifier")
 st.markdown("Upload a photo of food, and the API will identify it. Trained on a 9-class subset of Food-101.")
 
-# --- 2. API URL ---
-# Change this to your Render URL once deployed!
-API_URL = "http://localhost:8000/predict" 
+API_URL = "https://food-classifier-api-2ux2.onrender.com/predict"
 
 # --- 3. File Uploader ---
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
